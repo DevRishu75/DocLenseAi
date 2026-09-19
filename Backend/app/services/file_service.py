@@ -9,6 +9,8 @@ from app.services.embedding_service import EmbeddingService
 from app.storage.vectorstore import VectorStore
 from app.models.document_model import Document
 from app.models.user_model import User
+from app.exception_handling.upload_exception import UploadDocumentError
+from app.core.logging import logger
 # print(PDFLoader)
 class FileService:# Blueprint for creating FileService objects
     """Handles all the files related to --
@@ -35,19 +37,49 @@ class FileService:# Blueprint for creating FileService objects
         
         return file_path
     def process_pdf(self,file:UploadFile,db:Session,current_user:User)->dict:
-        #step 1: save file 
-        saved_path = self.save_uploaded_file(file)
-        print(f"Saved path : {saved_path}")
-        #Extracted raw text
-        raw_text = self.pdf_loader.extract_text(str(saved_path))
-        #clean text 
-        clean_text = self.text_cleaner.clean(raw_text)
-        chunks = self.chunker.chunk(clean_text)
-        print(type(chunks))
-        print(chunks)
-        print(f"chunks created : {len(chunks)}")
+        #step 1: save file
+        try:
+            
+                    saved_path = self.save_uploaded_file(file)
+                 
+                    print(f"Saved path : {saved_path}")
+                    #Extracted raw text
+                    raw_text = self.pdf_loader.extract_text(str(saved_path))
+                   
+                    print("RAW TEXT LENGTH:", len(raw_text))
+                    print("RAW TEXT PREVIEW:", repr(raw_text[:500]))
+                    
+                    clean_text = self.text_cleaner.clean(raw_text)
+                 
+                    print("CLEAN TEXT LENGTH:", len(clean_text))
+                    print("CLEAN TEXT PREVIEW:", repr(clean_text[:500]))
+                
+                    chunks = self.chunker.chunk(clean_text)
+        except Exception as error:
+             logger.exception("Document Processing Failed")
+             raise UploadDocumentError(
+                  message="Error while processing document",
+                  status_code=422,
+                  error_code="UPLOAD_DOCUMENT_ERROR"
+             )from error
+     
+        # print("CHUNK COUNT:", len(chunks))
+        logger.info(
+             "Chunks created ",
+             extra={
+                  "result_count":len(chunks)
+             }
+        )
+        # print(type(chunks))
+        # print(chunks)
+        # print(f"chunks created : {len(chunks)}")
         embeddings = self.embedding_service.embed_chunks(chunks)
-        print(f"embeddings generated : {len(embeddings)}")
+        
+        # print(f"embeddings generated : {len(embeddings)}")
+        logger.info("Embeddings Created Successfully",
+                    extra={
+                         "result_embeddings":len(embeddings)
+                    })
 
         # Create : PostgreSQL document--
         document = Document(
@@ -70,6 +102,13 @@ class FileService:# Blueprint for creating FileService objects
             }
             for i in range(len(chunks)) 
         ]
+        logger.info(
+             "Document Processed",
+             extra={
+                  "document_id":str(document.id),
+                  "chunk_count":len(chunks)
+             }
+        )
         self.vector_store.add_document(ids,chunks,metadatas,embeddings)
         print("Stored vectors:", self.vector_store.collection.count())
 

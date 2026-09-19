@@ -18,11 +18,6 @@ def get_documents(current_user:User = Depends(get_current_user),db: Session = De
 def get_document(document_id: UUID,db: Session = Depends(get_db), current_user:User=Depends(get_current_user)):
     service = DocumentService()
     document = service.get_document(document_id, db,current_user)
-    if document is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Document Not Found"
-        )
     return document
 
 @document_router.delete('/api/v1/documents/{document_id}')
@@ -31,11 +26,4 @@ def delete_document(document_id: UUID, db: Session = Depends(get_db), current_us
     
     # Do NOT call get_document here. delete_document already handles existence check.
     result = service.delete_document(document_id, db,current_user)
-    
-    if result is None:
-        raise HTTPException(
-            status_code=404,
-            detail="No content found for this id"
-        )
-        
     return result

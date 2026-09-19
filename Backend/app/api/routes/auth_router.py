@@ -16,11 +16,6 @@ def register(
        data = data,
         db=db
     )
-    if user is None:
-        raise HTTPException(
-            status_code=409,
-            detail="User already exists"
-        )
     return {
         "message":"User registered Successfully",
         "user_id": str(user.user_id),
@@ -36,9 +31,4 @@ def login(
         data = data,
         db = db
     )
-    if result is None:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid email or password"
-        )
     return result   #FastAPI serializes that Python dictionary into JSON and sends it back to the client.

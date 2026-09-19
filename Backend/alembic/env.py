@@ -2,6 +2,7 @@ from logging.config import fileConfig
 from app.db.base import Base
 from app.models.document_model import Document
 from app.models.user_model import User
+from app.models.Session_model import RefreshToken
 from dotenv import load_dotenv
 from alembic import context
 from app.database import engine
