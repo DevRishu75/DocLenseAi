@@ -54,6 +54,7 @@ class QueryService:
                {
                     "chunk_id": chunk_id,
                     "chunk_index":metadata.get("chunk_index"),
+                    "page_number": metadata.get("page_number"),
                     "source": metadata.get("source"),
                     "relevance_score":relevance_score
                }

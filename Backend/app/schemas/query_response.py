@@ -7,6 +7,7 @@ class QueryRequest(BaseModel):
 class SourceResponse(BaseModel):
     chunk_id:str
     chunk_index:Optional[int]=None
+    page_number:Optional[int]=None
     source:Optional[str]=None
     relevance_score:float
 

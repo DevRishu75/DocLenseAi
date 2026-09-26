@@ -12,6 +12,14 @@ class Chunker:
     """
       def __init__(self, strategy:str = "character"):
             self.splitter = SplitterFactory.get_splitter(strategy)
-      def chunk(self,text:str)->List[str]:
+      def chunk(self,pages:list[dict])->List[dict]:
+            chunks =[]
+            for page in pages:
+                  page_chunks = self.splitter.split(page["text"])
+            for chunk in page_chunks:
+                  chunks.append({
+                        "text":chunk,
+                        "page_number":page["page_number"]
+                  })
             '''converted clean text into chunk'''
-            return self.splitter.split(text)    
+            return chunks    
