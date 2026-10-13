@@ -5,6 +5,7 @@ from app.api.routes.auth_router import auth_router
 from app.api.routes.query import ask_router
 from app.api.routes.session_router import refresh_router
 from app.api.routes.logout import logout_router
+from app.api.routes.agent_router import agent_router
 from app.db.init_db import init_db
 from app.exception_handling.base_exception import AppException
 from app.exception_handling.handlin import app_exception_handler,app_unexecpted_handler
@@ -21,13 +22,13 @@ app = FastAPI(
 app.middleware('http')(request_logging_middleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origin=[
+    allow_origins=[
          "http://localhost:8000",
         "http://localhost:5173",
     ],
     allow_credentials=True,
-    allow_method=["*"],
-    allow_hearder=["*"]
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
 app.add_exception_handler(
     AppException,
@@ -54,3 +55,4 @@ app.include_router(auth_router)
 app.include_router(ask_router)
 app.include_router(refresh_router)
 app.include_router(logout_router)
+app.include_router(agent_router)

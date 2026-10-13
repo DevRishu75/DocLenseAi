@@ -45,8 +45,8 @@ class FileService:# Blueprint for creating FileService objects
                     print(f"Saved path : {saved_path}")
                     logger.info("File saved successfully",
                                 extra={
-                                     "filename":file.filename,
-                                     "file_path":file.str(saved_path)
+                                     "document_filename":file.filename,
+                                     "filepath":str(saved_path)
                                 })
                     
                     #Extracted raw text
@@ -55,14 +55,43 @@ class FileService:# Blueprint for creating FileService objects
                     pages = self.pdf_loader.extract_text(str(saved_path))
                     logger.info(
                       "PDF text extracted",
-                               extra={
-                                 "page_count": len(pages)
-                     }
-                  )
+                     extra={
+                       "page_count": len(pages),
+                       "total_characters": sum(len(page["text"]) for page in pages)
+                    }
+                )
+                #     logger.info(
+                #       "PDF text extracted",
+                #                extra={
+                #                  "page_count": len(pages)
+                #      }
+                #   )
                     # Clean text while preserving page numbers
                     cleaned_pages = self.text_cleaner.clean(pages)
+                    logger.info(
+                  "PDF text cleaned",
+                   extra={
+                  "page_count": len(cleaned_pages),
+                  "total_characters": sum(len(page["text"]) for page in cleaned_pages)
+    }
+)
                     # chunking the cleaned pages
+
                     chunks = self.chunker.chunk(cleaned_pages)
+                #     logger.info(
+                #     "Chunks created",
+                #      extra={"result_count": len(chunks)}
+                # )
+                    print("========== CHUNK DEBUG ==========")
+                    print("Number of pages:", len(cleaned_pages))
+                    print("Number of chunks:", len(chunks))
+                
+                    for i, chunk in enumerate(chunks[:5]):
+                        print(
+                        f"Chunk {i}: "
+                        f"characters={len(chunk['text'])}, "
+                        f"page={chunk['page_number']}"
+                    )
         except Exception as error:
              logger.exception("Document Processing Failed")
              raise UploadDocumentError(
@@ -71,13 +100,18 @@ class FileService:# Blueprint for creating FileService objects
                   error_code="UPLOAD_DOCUMENT_ERROR"
              )from error
      
-        # print("CHUNK COUNT:", len(chunks))
-        logger.info(
-             "Chunks created ",
-             extra={
-                  "result_count":len(chunks)
-             }
-        )
+    #     print("========== CHUNK DEBUG ==========")
+    #     print("Number of pages:", len(cleaned_pages))
+    #     print("Number of chunks:", len(chunks))
+
+    #     for i, chunk in enumerate(chunks[:5]):
+    #        print(
+    #     f"Chunk {i}: "
+    #     f"characters={len(chunk['text'])}, "
+    #     f"page={chunk['page_number']}"
+    # )
+
+    #     print("================================")
         # print(type(chunks))
         # print(chunks)
         # print(f"chunks created : {len(chunks)}")

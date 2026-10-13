@@ -17,7 +17,7 @@ ROLE: {message.get("role")}
 TOOL:{message.get("tool","")}
 CONTENT:{message.get("content")}
 """
-            return f"""
+        return f"""
 You are document analysis agent
 your goal is :
 {goal}

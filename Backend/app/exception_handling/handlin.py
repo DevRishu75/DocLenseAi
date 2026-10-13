@@ -24,7 +24,7 @@ async def app_unexecpted_handler(
         "Unexpected application error",
         extra={
             "method":request.method,
-            "path":request.path
+            "path":request.url.path
         }
     )
     return JSONResponse(

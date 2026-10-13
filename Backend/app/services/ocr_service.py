@@ -19,7 +19,17 @@ class OCRService:
             try:
                 image = Image.open(
                     BytesIO(image_bytes)
-                )
+                ).convert("RGB")
+                try:
+                     osd = pytesseract.image_to_osd(image,config="--psm 0")
+                     import re 
+                     match = re.search(r"Rotate:\s+(\d+)", osd)
+                     if match:
+                          rotation = int(match.group(1))%360
+                          if rotation:
+                            image = image.rotate(-rotation,expand=True)
+                except pytesseract.TesseractError:
+                    pass
                 text = pytesseract.image_to_string(image)
                 return text
             except Exception as error:

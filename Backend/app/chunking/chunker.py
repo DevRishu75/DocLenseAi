@@ -16,10 +16,9 @@ class Chunker:
             chunks =[]
             for page in pages:
                   page_chunks = self.splitter.split(page["text"])
-            for chunk in page_chunks:
-                  chunks.append({
+                  for chunk in page_chunks:
+                     chunks.append({
                         "text":chunk,
                         "page_number":page["page_number"]
                   })
-            '''converted clean text into chunk'''
             return chunks    

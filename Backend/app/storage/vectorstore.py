@@ -17,7 +17,7 @@ class VectorStore:
                 status_code=422,
                 error_code="VECTOR_ERROR"
             )from error
-    def search(self,embeddings,document_id,top_k :int = 5):
+    def search(self,embeddings,document_id,top_k :int = 20):
       try:
             return self.collection.query(query_embeddings=[embeddings],
                                                n_results = top_k, where={
