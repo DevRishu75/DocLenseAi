@@ -1,4 +1,4 @@
-from password import hash_password,verify_password
+from app.auth.password import hash_password,verify_password
 
 password = "Rishabh125"
 

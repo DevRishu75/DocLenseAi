@@ -1,4 +1,4 @@
-from jwt_token import create_access_token,create_refresh_token,decode_token
+from app.auth.jwt_token import create_access_token,create_refresh_token,decode_token
 import pytest
 
 def test_invalid_token_rejected():
