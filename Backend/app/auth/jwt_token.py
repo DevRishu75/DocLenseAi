@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY or len(SECRET_KEY.encode("utf-8")) < 32:
+    raise RuntimeError("SECRET_KEY must be configured with at least 32 bytes for HS256")
 ALGORITHM = "HS256"
 def create_access_token(user_id:str,expires_minutes:int=15)->str:
     expire = datetime.now(timezone.utc)+timedelta(minutes=expires_minutes)

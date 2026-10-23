@@ -27,8 +27,9 @@ def create_tool_registry()->ToolRegistry:
         ToolDefinition(
             name="search_document",
             description=("Search the user's document using semantic and keyword "
-                "search. Use this when you need relevant information "
-                "from the document."),
+                "search. Returns up to 8 unique chunks, and splits a question "
+                "into at most 4 focused searches when useful. Use this when "
+                "you need relevant information from the document."),
             parameters={
                 "question":{
                     "type":"string",
@@ -79,5 +80,3 @@ async def run_agent(document_id:UUID,request:AgentRequest,db:Session=Depends(get
         answer=state.final_answer or "",
         iteraton=state.iteration
     )
-
-    

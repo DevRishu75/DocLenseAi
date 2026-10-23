@@ -16,32 +16,67 @@ class QueryService:
     def ask(self,question,document_id,db,current_user):
         start = time.perf_counter()
 
-        if self.query_decomposer.should_decompose(question):
-            queries = self.query_decomposer.decompose(question=question)
-        else:
+        try:
+            if self.query_decomposer.should_decompose(question):
+                queries = self.query_decomposer.decompose(question=question)
+            else:
+                queries = [question]
+            if not isinstance(queries, list):
+                queries = [question]
+            queries = list(dict.fromkeys(
+                query.strip()
+                for query in queries
+                if isinstance(query, str) and query.strip()
+            ))[:4]
+            if not queries:
+                queries = [question]
+        except Exception:
+            logger.exception("Question decomposition failed; retrieving with the original question")
             queries = [question]
         print(
             f"Query Decomposition"
             f"{time.perf_counter()-start:.2f}s"
         )
         start = time.perf_counter()
+        retrieved_results = []
         for querie in queries:
-             retrieved_chunks = self.hybrid_retrieve.search(
+             retrieved_results.append(self.hybrid_retrieve.search(
                          question=querie,
                          document_id=document_id,
                          db=db,
                          current_user=current_user
-                     )
-        
+                     ))
+        if len(retrieved_results) == 1:
+             retrieved_chunks = retrieved_results[0]
+             chunks = retrieved_chunks.get('documents',[[]])[0]
+             chunks_ids = retrieved_chunks.get('ids',[[]])[0]
+             metadatas = retrieved_chunks.get('metadatas',[[]])[0]
+             distances = retrieved_chunks.get('distances',[[]])[0]
+        else:
+             chunks, chunks_ids, metadatas, distances = [], [], [], []
+             seen_chunk_ids = set()
+             unpacked = [
+                 (result.get('documents',[[]])[0], result.get('ids',[[]])[0],
+                  result.get('metadatas',[[]])[0], result.get('distances',[[]])[0])
+                 for result in retrieved_results
+             ]
+             max_rank = max((len(item[0]) for item in unpacked), default=0)
+             for rank in range(max_rank):
+                 for query_chunks, query_ids, query_metadata, query_distances in unpacked:
+                     if rank >= min(len(query_chunks), len(query_ids), len(query_metadata), len(query_distances)):
+                         continue
+                     chunk_id = query_ids[rank]
+                     if chunk_id in seen_chunk_ids:
+                         continue
+                     seen_chunk_ids.add(chunk_id)
+                     chunks.append(query_chunks[rank])
+                     chunks_ids.append(chunk_id)
+                     metadatas.append(query_metadata[rank])
+                     distances.append(query_distances[rank])
         print(
             f"retrieval time"
             f"{time.perf_counter()-start:.2f}s"
         )
-        chunks_ids = retrieved_chunks.get('ids',[[]])[0]
-        metadatas = retrieved_chunks.get('metadatas',[[]])[0]
-        distances = retrieved_chunks.get('distances',[[]])[0]
-        
-        chunks = retrieved_chunks.get('documents',[[]])[0]
         if not chunks:
                 return{
                     "answer":("I could not find the relevant information about the query."),
@@ -97,6 +132,14 @@ class QueryService:
         start = time.perf_counter()
 
         answer = self.llm_service.generate(prompt)
+        if answer.strip().lower().startswith("user safety:"):
+            logger.warning("LLM returned a safety label instead of an answer; retrying once")
+            answer = self.llm_service.generate(
+                prompt + "\n\nAnswer the document question directly using the provided document. "
+                "Do not return a safety classification or safety label."
+            )
+            if answer.strip().lower().startswith("user safety:"):
+                answer = "I could not produce a document answer just now. Please retry the question."
 
         print(
           f"Final LLM generation: "

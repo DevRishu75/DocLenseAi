@@ -3,9 +3,9 @@ from app.api.routes.upload import upload_router
 from app.api.routes.document import document_router
 from app.api.routes.auth_router import auth_router
 from app.api.routes.query import ask_router
+from app.api.routes.agent_router import agent_router
 from app.api.routes.session_router import refresh_router
 from app.api.routes.logout import logout_router
-from app.api.routes.agent_router import agent_router
 from app.db.init_db import init_db
 from app.exception_handling.base_exception import AppException
 from app.exception_handling.handlin import app_exception_handler,app_unexecpted_handler
@@ -53,6 +53,6 @@ app.include_router(upload_router)
 app.include_router(document_router)
 app.include_router(auth_router)
 app.include_router(ask_router)
+app.include_router(agent_router)
 app.include_router(refresh_router)
 app.include_router(logout_router)
-app.include_router(agent_router)

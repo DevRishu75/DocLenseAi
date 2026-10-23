@@ -3,6 +3,8 @@ import os
 from dotenv import load_dotenv
 from openrouter import OpenRouter
 
+from app.core.logging import logger
+
 from app.exception_handling.llm_exception import LLMExceptionError
 
 load_dotenv()
@@ -40,6 +42,7 @@ class LLMService:
             return content
 
         except Exception as error:
+            logger.exception("LLM request failed")
             raise LLMExceptionError(
                 message="LLM Error",
                 status_code=500,
