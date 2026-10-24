@@ -38,7 +38,7 @@ def test_refresh_token_contains_current_user():
 def test_access_and_refresh_token_aredifferent():
     user_id = "abc123"
     access_token = create_access_token(user_id)
-    refresh_token = create_access_token(user_id)
+    refresh_token = create_refresh_token(user_id)
     assert access_token != refresh_token
 
 
