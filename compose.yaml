@@ -2,9 +2,6 @@ name: doclenseai
 
 x-backend-image: &backend-image
   image: doclense-backend:production
-  build:
-    context: .
-    dockerfile: Backend/Dockerfile
 
 services:
   db:
@@ -72,14 +69,10 @@ services:
         condition: service_completed_successfully
 
   frontend:
-    build:
-      context: .
-      dockerfile: Frontend/Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL-}
+    image: doclenseai-frontend:latest
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-8080}:80"
+      - "${FRONTEND_PORT:-80}:80"
     depends_on:
       backend:
         condition: service_healthy
