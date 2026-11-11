@@ -734,34 +734,35 @@ The application uses a persistent ChromaDB collection named `BoardIQ`.
 
 ## Environment Configuration
 
-Create a local `.env` file only if the project uses a dotenv-based configuration.
-
-The following is a **template of configuration categories**, not a claim about the exact variable names currently implemented:
+For local development, copy `Backend/.env.example` to `Backend/.env` and set
+the values used by the application. Do not commit credentials.
 
 ```dotenv
-# PostgreSQL
-DATABASE_URL=<your-postgresql-connection-string>
-
-# Authentication
-JWT_SECRET_KEY=<strong-random-secret>
-JWT_ALGORITHM=<configured-signing-algorithm>
-ACCESS_TOKEN_EXPIRE_MINUTES=<configured-expiration>
-
-# LLM provider
+# Required server settings
+DATABASE_URL=postgresql://user:password@host:5432/database
+SECRET_KEY=<random-secret-at-least-32-bytes>
 OPENROUTER_API_KEY=<your-openrouter-api-key>
-OPENROUTER_MODEL=<configured-model-identifier>
 
-# Vector database
-CHROMA_PERSIST_DIRECTORY=database
-CHROMA_COLLECTION_NAME=BoardIQ
+# Backblaze B2 S3-compatible endpoint and application key
+B2_BUCKET_NAME=<private-bucket-name>
+B2_ENDPOINT_URL=https://s3.<region>.backblazeb2.com
+B2_REGION=<region>
+B2_KEY_ID=<application-key-id>
+B2_APPLICATION_KEY=<application-key>
 
-# OCR, if an explicit path is required
-TESSERACT_CMD=<path-to-tesseract-executable>
+# Deployment settings
+CORS_ORIGINS=https://your-frontend.example.com
+CHROMA_PERSIST_DIRECTORY=/data/chroma
+MAX_UPLOAD_SIZE_MB=50
 ```
 
-Map these placeholders to the configuration names actually read by the application. Do not add variables that the code does not use.
+`B2_REGION` must match the bucket's region. The B2 application key must have
+read, write, and delete access to the configured bucket. Set `TESSERACT_CMD`
+only when the `tesseract` executable is not on `PATH`.
 
-Keep `.env`, API keys, database credentials, and production secrets out of version control. A committed `.env.example` should contain placeholder values only.
+Keep `.env`, API keys, database credentials, and production secrets out of
+version control. `Frontend/.env.example` documents the frontend's
+`VITE_API_URL`; that value is embedded into the frontend at build time.
 
 ---
 
@@ -769,15 +770,16 @@ Keep `.env`, API keys, database credentials, and production secrets out of versi
 
 ### Backend
 
-If the FastAPI instance is exposed as `app` in `main.py` at the repository root, the command would be:
+From `Backend/`, run database migrations and start the API:
 
 ```bash
-uvicorn main:app --reload
+alembic upgrade head
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-If the application is located in a package, use the actual Python import path instead. For example, `app.main:app` is appropriate only if that module and variable exist in the repository.
-
-The `--reload` option is intended for development, not production deployment.
+Use `uvicorn app.main:app --reload` for local development only. The API needs
+the environment variables above, and the database must be reachable before
+startup.
 
 ### Frontend
 
@@ -791,6 +793,51 @@ npm run
 ```
 
 Then run the appropriate script defined by the project.
+
+### Container deployment
+
+The backend and frontend have separate production Dockerfiles. Build from the
+repository root so each image can access its package manifest:
+
+```bash
+docker build -f Backend/Dockerfile -t doclense-api .
+docker build -f Frontend/Dockerfile \
+  --build-arg VITE_API_URL=https://your-api.example.com \
+  -t doclense-frontend .
+```
+
+Deploy the backend container with `DATABASE_URL`, `SECRET_KEY`,
+`OPENROUTER_API_KEY`, the required `B2_*` values, and `B2_REGION` when it cannot
+be inferred from the endpoint, supplied through the hosting platform's
+secret/environment settings. Set `CORS_ORIGINS` to the exact
+frontend origin, expose the platform's `PORT`, and mount persistent writable
+storage at `/data/chroma`. Persisting `/data/chroma` is necessary because the
+vector index is local to the backend container. The frontend image serves the
+built Vite app with Nginx; rebuild it whenever `VITE_API_URL` changes. Do not
+pass credentials as Docker build arguments. Run `alembic upgrade head` as a
+single deployment job before starting the API; the backend image does not run
+migrations automatically.
+
+### Production Docker Compose
+
+`compose.yaml` uses the repository root as the build context, runs PostgreSQL,
+waits for it to become healthy, applies migrations once in a dedicated job, and
+then starts the API. PostgreSQL data, Chroma data, and the Hugging Face model
+cache use named volumes. The frontend's API URL is compiled into its image.
+
+Copy `compose.env.example` to `.env`, replace every placeholder, and run:
+
+```bash
+docker compose --env-file .env up --build -d
+```
+
+`DATABASE_URL` must match the PostgreSQL credentials and use the service name
+`db`; URL-encode special characters in its username or password. Set
+`VITE_API_URL` to the API's public URL and `CORS_ORIGINS` to the exact frontend
+origin. The published frontend and API ports bind to localhost by default, so
+put an HTTPS reverse proxy in front of them. The B2 and OpenRouter settings are
+required by application features. Keep the populated `.env` out of version
+control, and back up the `postgres_data` and `chroma_data` volumes.
 
 ### API Documentation
 

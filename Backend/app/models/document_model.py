@@ -25,4 +25,8 @@ class Document(Base):
         default = datetime.utcnow,
         nullable = False
     )
+    storage_key = Column(
+        String,
+        nullable=True
+    )
      

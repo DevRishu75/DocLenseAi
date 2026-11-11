@@ -5,6 +5,7 @@ from app.storage.vectorstore import VectorStore
 from app.models.user_model import User
 from app.exception_handling.document_exception import DocumentNotFoundError
 from app.exception_handling.vector_exception import VectorError
+from app.services.b2_storage import B2Storage
 
 class DocumentService:
     UPLOAD_FOLDER = Path('uploads')
@@ -39,12 +40,9 @@ class DocumentService:
         if document is None:
             raise DocumentNotFoundError(
                 message="Document does not exists",
-                status_code=500,
+                status_code=404,
                 error_code="DOCUMENT_NOT_FOUND_ERROR"
             )
-        file_path = self.UPLOAD_FOLDER/document.filename
-        if file_path.exists():
-            file_path.unlink()
         chunk_before_delete = self.vector_store.count_document_chunk(document_id)
         print(chunk_before_delete)
         self.vector_store.delete_document(document_id)
@@ -56,6 +54,12 @@ class DocumentService:
                 status_code=422,
                 error_code="VECTOR_ERROR"
             )
+        if document.storage_key:
+            B2Storage().delete_file(document.storage_key)
+        else:
+            file_path = self.UPLOAD_FOLDER/document.filename
+            if file_path.exists():
+                file_path.unlink()
         db.delete(document)
         db.commit()
         return {

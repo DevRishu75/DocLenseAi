@@ -1,9 +1,13 @@
+import os
+
 from chromadb import PersistentClient
 from app.exception_handling.vector_exception import VectorError
 from app.core.logging import logger
 class VectorStore:
     def __init__(self):
-      self.client = PersistentClient(path = 'database')
+      self.client = PersistentClient(
+          path=os.getenv("CHROMA_PERSIST_DIRECTORY", "database")
+      )
       self.collection = self.client.get_or_create_collection(name= "BoardIQ")
     def add_document(self,ids,documents,metadatas,embeddings):
         try:
@@ -41,7 +45,7 @@ class VectorStore:
                           message="Error while finding deleting document vector inside DB",
                           status_code=400,
                           error_code="VECTOR_ERROR"
-            )
+            ) from error
     def count_document_chunk(self,document_id):
         try:
             results = self.collection.get(

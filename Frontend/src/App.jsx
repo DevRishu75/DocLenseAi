@@ -9,8 +9,8 @@ import {
 
 // Vite exposes client-side environment variables through import.meta.env.
 // This fallback is useful when running the frontend locally.
-// const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// const API = import.meta.env.VITE_API_URL || ''
+const API = import.meta.env.VITE_API_URL || ''
 
 // Keep auth header formatting in one place so every protected request is
 // consistent. A bearer token proves the signed-in user's identity to the API.
@@ -112,7 +112,7 @@ function App() {
   const [showSources, setShowSources] = useState(true)
   const [page, setPage] = useState('home')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [documentMenu, setDocumentMenu] = useState('')
+  const [documentMenu, setDocumentMenu] = useState(null)
   const [nicknames, setNicknames] = useState(() => JSON.parse(localStorage.getItem('docLenseAI_nicknames') || '{}'))
   // useRef holds DOM nodes without triggering a render. These refs let buttons
   // open the hidden file picker and let us focus the question box after sending.
@@ -152,6 +152,15 @@ function App() {
     const pane = document.querySelector('.conversation-scroll')
     if (pane) pane.scrollTop = pane.scrollHeight
   }, [history, sending])
+
+  useEffect(() => {
+    if (!documentMenu) return
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setDocumentMenu(null)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [documentMenu])
 
   async function loadDocuments(preferredId) {
     // Async event helpers can await network requests; loading state drives the
@@ -210,6 +219,9 @@ function App() {
 
   async function deleteDocument(doc) {
     if (!window.confirm(`Delete “${doc.filename}”?`)) return
+    setError('')
+    setNotice('Deleting document…')
+    setDocumentMenu(null)
     try {
       await request(`/api/v1/documents/${doc.document_id}`, { method: 'DELETE' }, token)
       const remaining = documents.filter((item) => item.document_id !== doc.document_id)
@@ -219,8 +231,11 @@ function App() {
         localStorage.setItem('docLenseAI_nicknames', JSON.stringify(next)); return next
       })
       if (activeId === doc.document_id) { setActiveId(remaining[0]?.document_id || ''); setHistory([]) }
-      setDocumentMenu('')
-    } catch (err) { setError(err.message) }
+      setNotice(`${doc.filename} was deleted.`)
+    } catch (err) {
+      setNotice('')
+      setError(`Could not delete "${doc.filename}": ${err.message}`)
+    }
   }
 
   function renameDocument(doc) {
@@ -229,7 +244,26 @@ function App() {
     const next = { ...nicknames }
     if (nickname.trim() && nickname.trim() !== doc.filename) next[doc.document_id] = nickname.trim()
     else delete next[doc.document_id]
-    setNicknames(next); localStorage.setItem('docLenseAI_nicknames', JSON.stringify(next)); setDocumentMenu('')
+    setNicknames(next); localStorage.setItem('docLenseAI_nicknames', JSON.stringify(next)); setDocumentMenu(null)
+  }
+
+  function toggleDocumentMenu(event, doc) {
+    if (documentMenu?.documentId === doc.document_id) {
+      setDocumentMenu(null)
+      return
+    }
+
+    const buttonBounds = event.currentTarget.getBoundingClientRect()
+    const menuHeight = 82
+    const top = buttonBounds.bottom + menuHeight > window.innerHeight
+      ? Math.max(8, buttonBounds.top - menuHeight - 4)
+      : buttonBounds.bottom + 4
+
+    setDocumentMenu({
+      documentId: doc.document_id,
+      top,
+      right: Math.max(8, window.innerWidth - buttonBounds.right),
+    })
   }
 
 
@@ -261,7 +295,7 @@ function App() {
     body.append('file',file)
     try{
       const result = await request('/api/v1/uploads',{method:'POST',body},token)
-      setNotice(`${file.name}is ready to explore.`)
+      setNotice(`${file.name} is ready to explore.`)
       await loadDocuments(result.document_id)
       setHistory([])
     }
@@ -303,6 +337,7 @@ function App() {
   if (!token) return <AuthScreen {...{ authMode, setAuthMode, authEmail, setAuthEmail, password, setPassword, submitAuth, error, setError }} />
 
   const filteredDocs = documents.filter((doc) => `${doc.filename} ${nicknames[doc.document_id] || ''}`.toLowerCase().includes(search.toLowerCase()))
+  const menuDocument = documentMenu && documents.find((doc) => doc.document_id === documentMenu.documentId)
   // JSX describes the UI as a tree. Curly braces embed JavaScript expressions,
   // and handlers such as onClick update state or start async work.
   return (
@@ -318,7 +353,7 @@ function App() {
             {loadingDocs ? <div className="sidebar-empty"><LoaderCircle className="spin" size={17} /> Loading documents…</div> : filteredDocs.length ? filteredDocs.map((doc) => (
               <div key={doc.document_id} className={`document-row ${activeId === doc.document_id ? 'active' : ''}`}><button className="document-item" onClick={() => { setPage('documents'); setActiveId(doc.document_id); setHistory([]); setError(''); setNotice(''); setMenuOpen(false) }}>
                 <span className="pdf-icon"><FileText size={16} /></span><span className="document-name">{nicknames[doc.document_id] || doc.filename}</span>
-              </button><button className="icon-button tiny doc-menu-button" aria-label={`Options for ${doc.filename}`} onClick={() => setDocumentMenu(documentMenu === doc.document_id ? '' : doc.document_id)}><MoreHorizontal size={15} /></button>{documentMenu === doc.document_id && <div className="document-menu"><button onClick={() => renameDocument(doc)}><Pencil size={14} /> Add nickname</button><button className="delete-action" onClick={() => deleteDocument(doc)}><Trash2 size={14} /> Delete</button></div>}</div>
+              </button><button className="icon-button tiny doc-menu-button" aria-label={`Options for ${doc.filename}`} aria-expanded={documentMenu?.documentId === doc.document_id} onClick={(event) => toggleDocumentMenu(event, doc)}><MoreHorizontal size={15} /></button></div>
             )) : <div className="sidebar-empty">{search ? 'No matching documents.' : 'Your documents will appear here.'}</div>}
           </div>
         </div>
@@ -327,6 +362,8 @@ function App() {
 
       <main className="main-panel">
         <header className="topbar"><button className="icon-button menu-toggle" aria-label="Open navigation" onClick={() => setMenuOpen(!menuOpen)}><Menu size={19} /></button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-slash">/</span><strong>{page === 'home' ? 'Home' : (activeDoc ? nicknames[activeId] || activeDoc.filename : 'My documents')}</strong></div><div className="topbar-actions"><span className="secure-label"><ShieldCheck size={15} /> Private workspace</span><button className="avatar avatar-small" title={email} aria-label="Go to home" onClick={() => { setPage('home'); setMenuOpen(false) }}>{email.slice(0, 1).toUpperCase()}</button></div></header>
+        {error && <div className="inline-alert" role="alert"><span>{error}</span><button onClick={() => setError('')} aria-label="Dismiss"><X size={15} /></button></div>}
+        {notice && <div className="inline-notice" role="status"><Check size={14} /> {notice}</div>}
         <div className="work-area">
           {page === 'home' ? <section className="home-screen"><div className="home-brand" aria-label="DOCLENSEAI"><span>DOCLENSEAI</span></div><button className="home-chat-button" onClick={() => { setPage('documents'); if (activeDoc) setHistory([]) }}><MessageSquareText size={18} /> Chat with DocLense AI <ArrowRight size={16} /></button><button className="home-documents-link" onClick={() => setPage('documents')}>Open documents <span>{documents.length}</span></button></section> : <>
           {!activeDoc ? <EmptyState uploading={uploading} onUpload={() => fileRef.current?.click()} onDrop={uploadFiles} /> : <>
@@ -336,8 +373,6 @@ function App() {
               <div className={`conversation-scroll ${history.length ? 'has-history' : ''}`}>
                 {!history.length ? <div className="welcome-state"><div className="welcome-art"><span className="art-sheet sheet-back"></span><span className="art-sheet sheet-front"><i></i><i></i><i></i><b><Sparkles size={17} /></b></span><span className="art-spark spark-one">✳</span><span className="art-spark spark-two">✦</span></div><h2>A little less searching.<br /><span>A lot more understanding.</span></h2><p>Ask a question about this document and get a clear answer with references to the source.</p><div className="suggestion-row"><button onClick={() => ask('Summarize the key points in this document')}>Summarize the key points <ArrowRight size={14} /></button><button onClick={() => ask('What are the main dates and deadlines?')}>Find dates & deadlines <ArrowRight size={14} /></button></div></div> : <div className="conversation-content">{history.map((item, index) => <div className="turn" key={`${item.question}-${index}`}><div className="user-question"><div className="avatar avatar-mini">{email.slice(0, 1).toUpperCase()}</div><p>{item.question}</p></div><div className="assistant-answer"><div className="answer-avatar"><Sparkles size={15} /></div><div className="answer-body">{item.answer === null ? <div className="thinking"><span></span><span></span><span></span><small>Reading your document…</small></div> : <><p className={item.failed ? 'answer-error' : ''}>{item.answer}</p>{item.sources?.length > 0 && <div className="sources"><button className="sources-toggle" onClick={() => setShowSources(!showSources)}><span><Files size={14} /> Sources <span className="source-count">{item.sources.length}</span></span><ChevronDown size={15} className={showSources ? '' : 'closed'} /></button>{showSources && <div className="source-list">{item.sources.map((source, sourceIndex) => <div className="source-card" key={source.chunk_id || sourceIndex}><div className="source-card-top"><span className="source-number">{sourceIndex + 1}</span><strong>{source.source || activeDoc.filename}</strong><span className="page-label">{source.page_number ? `Page ${source.page_number}` : 'Document'}</span></div><div className="source-meta">Excerpt {source.chunk_index !== null && source.chunk_index !== undefined ? `· section ${source.chunk_index + 1}` : ''} <span className="relevance"><Check size={11} /> {Math.round((source.relevance_score || 0) * 100)}% match</span></div></div>)}</div>}</div>}</>}</div></div></div>)}</div>}
               </div>
-              {error && <div className="inline-alert"><span>{error}</span><button onClick={() => setError('')} aria-label="Dismiss"><X size={15} /></button></div>}
-              {notice && <div className="inline-notice"><Check size={14} /> {notice}</div>}
               <form className="composer" onSubmit={(e) => { e.preventDefault(); ask() }}><textarea ref={promptRef} value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask() } }} placeholder="Ask anything about this document…" rows={2} disabled={sending} /><div className="composer-bottom"><span><span className="composer-hint"><Sparkles size={13} /> Answers include source references</span><span className="key-hint">↵ to send · ⇧↵ for new line</span></span><button className="send-button" type="submit" disabled={!question.trim() || sending} aria-label="Send question">{sending ? <LoaderCircle className="spin" size={17} /> : <ArrowUp size={18} />}</button></div></form>
               <div className="chat-footnote"><ShieldCheck size={13} /> Your documents are private and only visible to you.</div>
             </div>
@@ -346,6 +381,13 @@ function App() {
         </div>
       </main>
       <input className="hidden-input" ref={fileRef} type="file" accept="application/pdf,.pdf" onChange={(e) => uploadFiles(e.target.files)} />
+      {menuDocument && <>
+        <button className="document-menu-backdrop" aria-label="Close document options" onClick={() => setDocumentMenu(null)} />
+        <div className="document-menu" role="menu" style={{ top: documentMenu.top, right: documentMenu.right }}>
+          <button role="menuitem" onClick={() => renameDocument(menuDocument)}><Pencil size={14} /> Add nickname</button>
+          <button className="delete-action" role="menuitem" onClick={() => deleteDocument(menuDocument)}><Trash2 size={14} /> Delete</button>
+        </div>
+      </>}
     </div>
   )
 }

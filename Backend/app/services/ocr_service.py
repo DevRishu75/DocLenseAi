@@ -1,3 +1,5 @@
+import os
+
 import pytesseract
 
 from PIL import Image
@@ -5,16 +7,10 @@ from io import BytesIO
 from app.exception_handling.ocr_exception import OCRExceptionError
 
 class OCRService:
-    TESSERACT_PATH = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     def __init__(self):
-        try:
-            pytesseract.pytesseract.tesseract_cmd = self.TESSERACT_PATH
-        except Exception as error:
-            raise OCRExceptionError(
-                message="OCR Service Initialization failure",
-                status_code=500,
-                error_code="OCR_INITIALIZATION_ERROR"
-            )from error
+        configured_path = os.getenv("TESSERACT_CMD")
+        if configured_path:
+            pytesseract.pytesseract.tesseract_cmd = configured_path
     def extract_text_from_image(self,image_bytes:bytes)->str:
             try:
                 image = Image.open(

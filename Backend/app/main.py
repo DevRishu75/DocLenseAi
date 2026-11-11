@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from app.api.routes.upload import upload_router
 from app.api.routes.document import document_router
@@ -6,7 +8,6 @@ from app.api.routes.query import ask_router
 from app.api.routes.agent_router import agent_router
 from app.api.routes.session_router import refresh_router
 from app.api.routes.logout import logout_router
-from app.db.init_db import init_db
 from app.exception_handling.base_exception import AppException
 from app.exception_handling.handlin import app_exception_handler,app_unexecpted_handler
 from app.core.logging import setup_logging
@@ -14,6 +15,15 @@ from app.middleware.request_logging import request_logging_middleware
 from fastapi.middleware.cors import CORSMiddleware
 
 setup_logging()
+cors_origins = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://localhost:8000",
+    ).split(",")
+    if origin.strip()
+]
+
 app = FastAPI(
     title = "DOCUMIND AI",
     description = "AI powered Docuement Intelligence Engine",
@@ -22,10 +32,7 @@ app = FastAPI(
 app.middleware('http')(request_logging_middleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-         "http://localhost:8000",
-        "http://localhost:5173",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -38,14 +45,17 @@ app.add_exception_handler(
     Exception,
     app_unexecpted_handler
 )
-init_db()
-
 @app.get("/")
 def root():
     return{
         "message": "Welcome to DOCUMIND AI ",
         "Success": 200
     }
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 # print(upload_router.routes)
 # for route in app.routes:
 #     print(route.path, route.methods)
